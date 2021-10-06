@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+import argparse
+import configparser
+import string
+import sys
+import time
+
+import schedule
+
+from dns_censorer.aams import AAMSBind
+from dns_censorer.cncpo import CNCPOBind
+from dns_censorer.notification import CNCPOMailer, BindReloader
+
+
+def fatal_error(message, exit_code=1):
+    sys.stderr.write("%s\n" % message)
+    sys.exit(exit_code)
+
+
+parser = argparse.ArgumentParser(description='Bind DNS censorer')
+parser.add_argument('-c', '--config', help='Configuration file', required=True)
+args = parser.parse_args()
+config_file = args.config
+
+config = configparser.ConfigParser()
+config.read(config_file)
+if not config.sections():
+    fatal_error("Cannot read config sections")
+sections = config.sections()
+
+reloader = BindReloader()
+if 'rndc' in sections:
+    if 'path' in config['rndc']:
+        reloader.rndc_path = config['rndc']['path']
+    if 'key' in config['rndc']:
+        reloader.rndc_key = config['rndc']['key']
+else:
+    print("WARNING: missing rndc configuration, going with default")
+
+mailer = None
+if 'mailer' in sections:
+    mailer_cfg = config['mailer']
+    if 'server' not in mailer_cfg:
+        fatal_error("Missing server in mailer config")
+    if 'sender' not in mailer_cfg:
+        fatal_error("Missing sender in mailer config")
+    if 'recipients' not in mailer_cfg:
+        fatal_error("Missing recipients in mailer config")
+    mailer = CNCPOMailer(mailer_cfg['server'], mailer_cfg['sender'], mailer_cfg['recipients'].split())
+    if 'subject' in mailer_cfg:
+        mailer.subject = mailer_cfg['subject']
+    if 'body' in mailer_cfg:
+        mailer.body = mailer_cfg['body']
+    if 'ssl' in mailer_cfg and mailer_cfg['ssl']:
+        mailer.smtp_ssl = mailer_cfg['ssl']
+    if 'username' in mailer_cfg:
+        mailer.username = mailer_cfg['username']
+    if 'password' in mailer_cfg:
+        mailer.username = mailer_cfg['password']
+    sections.remove('mailer')
+else:
+    print("WARNING: missing mailer configuration, no CNCPO notification will be sent")
+
+censorers = list()
+for section in sections:
+    censorer = None
+    cfg = config[section]
+    # Check mandatories
+    if 'type' not in cfg:
+        fatal_error("Missing type for censorer %s" % section)
+    if 'conf_file' not in cfg:
+        fatal_error("Missing conf_file for censorer %s" % section)
+    if 'scheduler_type' not in cfg:
+        fatal_error("Missing scheduler_type for censorer %s" % section)
+    if 'schedule' not in cfg:
+        fatal_error("Missing schedule for censorer %s" % section)
+
+    if cfg['type'].upper() == 'CNCPO':
+        print("Adding CNCPO censorer %s" % section)
+        if 'certificate' not in cfg:
+            fatal_error("Missing certificate for censorer %s" % section)
+        if 'key' not in cfg:
+            fatal_error("Missing key for censorer %s" % section)
+        if 'url' not in cfg:
+            fatal_error("Missing url for censorer %s" % section)
+        if 'template' in cfg:
+            censorer = CNCPOBind(cfg['certificate'], cfg['key'], cfg['url'], cfg['conf_file'],
+                                 template=string.Template(cfg['template']),
+                                 name=section)
+        else:
+            censorer = CNCPOBind(cfg['certificate'], cfg['key'], cfg['url'], cfg['conf_file'],
+                                 name=section)
+
+    elif cfg['type'].upper() == 'AAMS':
+        print("Adding AAMS censorer %s" % section)
+        if 'url' not in cfg:
+            fatal_error("Missing url for censorer %s" % section)
+        if 'url_checksum' not in cfg:
+            fatal_error("Missing url for censorer %s" % section)
+        if 'template' in cfg:
+            censorer = AAMSBind(cfg['url'], cfg['url_checksum'], cfg['conf_file'],
+                                template=string.Template(cfg['template']),
+                                name=section)
+        else:
+            censorer = AAMSBind(cfg['url'], cfg['url_checksum'], cfg['conf_file'],
+                                name=section)
+    else:
+        fatal_error("Invalid censorer type %s" % cfg['type'])
+
+    if cfg['scheduler_type'] == 'fixed':
+        schedules = cfg['schedule'].split()
+        for s in schedules:
+            print("Scheduling execution at %s every day" % s)
+            schedule.every().day.at(s).do(censorer.download_and_apply_if_updated)
+    elif cfg['scheduler_type'] == 'interval':
+        print("Scheduling execution every %s seconds" % cfg['schedule'])
+        schedule.every(int(cfg['schedule'])).seconds.do(censorer.download_and_apply_if_updated)
+    else:
+        fatal_error("Wrong scheduler type %s" % cfg['scheduler_type'])
+    if mailer:
+        censorer.register_observer(mailer)
+    censorer.register_observer(reloader)
+    censorers.append(censorer)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)

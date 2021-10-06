@@ -1,0 +1,13 @@
+; Dummy zone to redirect sites censored
+
+$TTL 5M
+@	IN	SOA	localhost. noc.tecnoadsl.it. (
+				1		; serial number
+				4W		; refresh
+				4W		; retry
+				4W		; expire
+				5M )		; negative caching TTL
+
+		NS	localhost.
+
+*		A	172.30.254.1
