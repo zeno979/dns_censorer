@@ -9,6 +9,7 @@ setup(
     license='GPLv2',
     keywords='dns bind aams cncpo',
     packages=['dns_censorer'],
+    scripts=['censorer'],
     install_requires=[
         'requests',
         'schedule'

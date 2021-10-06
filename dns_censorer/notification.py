@@ -49,4 +49,4 @@ class BindReloader:
 
     def notify(self, source, version_tuple):
         self.__logger.info("Issuing Bind reload")
-        subprocess.run([self.rndc_path, '-k', self.rndc_key, 'reload'])
+        subprocess.call([self.rndc_path, '-k', self.rndc_key, 'reload'])

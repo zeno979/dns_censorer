@@ -42,9 +42,9 @@ class AAMSBind(BindCensorer):
             with open('%s/%s' % (self.spool_dir, self.name), 'rb') as file:
                 file_content = file.read()
                 file_hash = hashlib.sha256(file_content).hexdigest()
-            r = requests.get(self.spool_dir, timeout=10, verify=False)
+            r = requests.get(self.url_checksum, timeout=10, verify=False)
             if r.ok and r.text == file_hash:
-                return hash, time.time()
+                return file_hash, int(time.time())
 
     def apply(self, version_tuple):
         with open('%s/%s' % (self.spool_dir, self.name), 'r') as txt:
@@ -52,6 +52,18 @@ class AAMSBind(BindCensorer):
             with open(self.conf_file, 'w') as out:
                 out.write('//SERIAL:%s//TIMESTAMP:%s\n' % version_tuple)
                 for line in lines:
-                    out.write(self.template.substitute(name=line.rstrip()))
+                    out.write(self.template.substitute(zone=line.rstrip()))
                     out.write('\n')
                 self.notify_observers(version_tuple)
+
+    def updated(self, version_tuple):
+        """
+        Compare version tuple with vcurrent version
+        :param version_tuple:
+        :return: true on changes
+        """
+        serial, ts = self.current_version()
+        if serial == version_tuple[0]:
+            return False
+        else:
+            return True

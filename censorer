@@ -34,6 +34,7 @@ if 'rndc' in sections:
         reloader.rndc_path = config['rndc']['path']
     if 'key' in config['rndc']:
         reloader.rndc_key = config['rndc']['key']
+    sections.remove('rndc')
 else:
     print("WARNING: missing rndc configuration, going with default")
 

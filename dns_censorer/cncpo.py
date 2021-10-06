@@ -65,6 +65,6 @@ class CNCPOBind(BindCensorer):
                 for line in lines:
                     parts = line.split(';')
                     zone = parts[1].strip()
-                    out.write(self.template.substitute(name=zone))
+                    out.write(self.template.substitute(zone=zone))
                     out.write('\n')
             self.notify_observers(version_tuple)

@@ -48,11 +48,13 @@ class BindCensorer(ABC):
         try:
             with open(self.conf_file, 'r') as f:
                 firstline = f.readline().rstrip()
-                match = re.search('\/\/SERIAL:(\d+)\/\/TIMESTAMP:(\d+)', firstline)
+                match = re.search('\/\/SERIAL:(.*)\/\/TIMESTAMP:(.*)', firstline)
                 if match:
                     return match.group(1), match.group(2)
+            return 0, 0
         except FileNotFoundError:
             self.__logger.warning('%s Bind config file error' % self.name)
+            return 0, 0
 
     def updated(self, version_tuple):
         """
