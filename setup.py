@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='dns_censorer',
-    version='0.1.0',
+    version='1.0.0.dev1',
     author='Sergio Tosti',
     author_email='sergio.tosti -AT- gmail.com',
     description='Blacklist downloader and applier for BIND',

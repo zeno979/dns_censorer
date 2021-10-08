@@ -8,7 +8,7 @@ from dns_censorer.censorer import BindCensorer
 
 
 class CNCPOBind(BindCensorer):
-    def __init__(self, certificate, key, url, conf_file=None,
+    def __init__(self, url, certificate=None, key=None,  conf_file=None,
                  template=string.Template('zone "$zone" {type master; file "db.cncpo"; };'),
                  spool_dir='/tmp', name=None):
         """
@@ -33,7 +33,12 @@ class CNCPOBind(BindCensorer):
         :return: (version, timestamp)
         """
         try:
-            response = requests.get(self.url, cert=(self.certificate, self.key), timeout=10, verify=False)
+            if self.certificate:
+                self.__logger.info("Trying certificate authentication on %s" % self.url)
+                response = requests.get(self.url, cert=(self.certificate, self.key), timeout=10, verify=False)
+            else:
+                self.__logger.info("Trying anonymous download from %s" % self.url)
+                response = requests.get(self.url, timeout=10, verify=False)
         except requests.exceptions.RequestException as e:
             self.__logger.warning("%s Download exception: %s" % (self.name, e))
             return None
@@ -62,9 +67,13 @@ class CNCPOBind(BindCensorer):
             self.__logger.info("Applying %s version %s" % (self.name, version_tuple[0]))
             with open(self.conf_file, 'w') as out:
                 out.write('//SERIAL:%s//TIMESTAMP:%s\n' % version_tuple)
+                zones = list()
                 for line in lines:
                     parts = line.split(';')
                     zone = parts[1].strip()
+                    if zone and zone not in zones:
+                        zones.append(zone)
+                for zone in zones:
                     out.write(self.template.substitute(zone=zone))
                     out.write('\n')
             self.notify_observers(version_tuple)

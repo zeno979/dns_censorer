@@ -51,10 +51,15 @@ class AAMSBind(BindCensorer):
             lines = txt.readlines()
             with open(self.conf_file, 'w') as out:
                 out.write('//SERIAL:%s//TIMESTAMP:%s\n' % version_tuple)
+                zones = list()
                 for line in lines:
-                    out.write(self.template.substitute(zone=line.rstrip()))
+                    zone = line.rstrip()
+                    if zone and zone not in zones:
+                        zones.append(zone)
+                for zone in zones:
+                    out.write(self.template.substitute(zone=zone))
                     out.write('\n')
-                self.notify_observers(version_tuple)
+            self.notify_observers(version_tuple)
 
     def updated(self, version_tuple):
         """

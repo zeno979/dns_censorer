@@ -1,7 +1,9 @@
+import datetime
 import logging
 import smtplib
 import string
 import subprocess
+from email.mime.text import MIMEText
 
 from dns_censorer.cncpo import CNCPOBind
 
@@ -32,11 +34,19 @@ class CNCPOMailer:
                 server = smtplib.SMTP(self.smtp_server, self.smtp_port)
             if self.username:
                 server.login(self.username, self.password)
-            tpl = string.Template("From: %s\n\rTo: %s\n\rSubject: %s\n\r\n\r%s"
-                                    % (self.sender, ", ".join(self.recipients), self.subject, self.body))
-            message = tpl.substitute(version=version_tuple[0], timestamp=version_tuple[1])
-            server.sendmail(self.sender, self.recipients, message)
+
+            tpl = string.Template(self.body)
+            body = tpl.substitute(version=version_tuple[0], timestamp=version_tuple[1])
+
+            msg = MIMEText(body)
+            msg['Date'] = datetime.datetime.now().ctime()
+            msg['Subject'] = self.subject
+            msg['X-Mailer'] = "DNS_Censorer"
+            msg['To'] = ", ".join(self.recipients)
+            msg['From'] = self.sender
+            server.sendmail(self.sender, self.recipients, msg.as_string())
             server.quit()
+
         except Exception as e:
             self.__logger.error(e)
 

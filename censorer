@@ -79,17 +79,22 @@ for section in sections:
     if cfg['type'].upper() == 'CNCPO':
         print("Adding CNCPO censorer %s" % section)
         if 'certificate' not in cfg:
-            fatal_error("Missing certificate for censorer %s" % section)
-        if 'key' not in cfg:
-            fatal_error("Missing key for censorer %s" % section)
+            print("Warning: no certificate provided for censorer %s, will try without authentication" % section)
+            certificate = None
+            key = None
+        else:
+            certificate = cfg['certificate']
+            if 'key' not in cfg:
+                fatal_error("Missing certificate key for censorer %s" % section)
+            key = cfg['key']
         if 'url' not in cfg:
             fatal_error("Missing url for censorer %s" % section)
         if 'template' in cfg:
-            censorer = CNCPOBind(cfg['certificate'], cfg['key'], cfg['url'], cfg['conf_file'],
+            censorer = CNCPOBind(cfg['url'], certificate=certificate, key=key, conf_file=cfg['conf_file'],
                                  template=string.Template(cfg['template']),
                                  name=section)
         else:
-            censorer = CNCPOBind(cfg['certificate'], cfg['key'], cfg['url'], cfg['conf_file'],
+            censorer = CNCPOBind(cfg['url'], certificate=cfg['certificate'], key=cfg['key'], conf_file=cfg['conf_file'],
                                  name=section)
 
     elif cfg['type'].upper() == 'AAMS':
