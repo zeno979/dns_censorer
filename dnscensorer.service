@@ -1,0 +1,13 @@
+[Unit]
+Description=DNS Censorer
+After=network.target
+
+[Service]
+StandardOutput=journal+console
+StandardError=journal+console
+Type=simple
+ExecStart=/usr/bin/censorer -c /etc/censorer.cfg
+User=censorer
+
+[Install]
+WantedBy=multi-user.target
