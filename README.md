@@ -7,7 +7,7 @@ Use it at your own risk.
 Any form of contribution is welcome.
 
 ## Introduction
-Italian authorities require ISPs obscure certain sites by blaklisting them on DNS.
+Italian authorities require ISPs obscure certain sites by blacklisting them on DNS.
 This tool automates donwloading and appying blaclists, it can also send email for CNCPO
 application, as rules requires.
 
