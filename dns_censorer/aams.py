@@ -46,20 +46,27 @@ class AAMSBind(BindCensorer):
             if r.ok and r.text == file_hash:
                 return file_hash, int(time.time())
 
-    def apply(self, version_tuple):
+    def apply(self, version_tuple, ignored_zones=None):
+        if ignored_zones is None:
+            ignored_zones = list()
+        zones = list()
         with open('%s/%s' % (self.spool_dir, self.name), 'r') as txt:
             lines = txt.readlines()
             with open(self.conf_file, 'w') as out:
                 out.write('//SERIAL:%s//TIMESTAMP:%s\n' % version_tuple)
-                zones = list()
                 for line in lines:
                     zone = line.rstrip()
-                    if zone and zone not in zones:
+                    if zone and zone not in zones and zone not in ignored_zones:
                         zones.append(zone)
+                        self.__logger.info("Adding zone %s for %s" % (zone, self.name))
+                    else:
+                        self.__logger.info("Skipping zone %s for %s" % (zone, self.name))
                 for zone in zones:
                     out.write(self.template.substitute(zone=zone))
                     out.write('\n')
             self.notify_observers(version_tuple)
+        self.zones = zones
+
 
     def updated(self, version_tuple):
         """

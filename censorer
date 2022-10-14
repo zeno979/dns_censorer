@@ -4,6 +4,7 @@ import configparser
 import string
 import sys
 import time
+from threading import Lock
 
 import schedule
 
@@ -15,6 +16,16 @@ from dns_censorer.notification import CNCPOMailer, BindReloader
 def fatal_error(message, exit_code=1):
     sys.stderr.write("%s\n" % message)
     sys.exit(exit_code)
+
+
+def run_task(cens):
+    global censorers
+    global lock
+    with lock:
+        ignored_zones = list()
+        for i in filter(lambda c: c.name != cens.name, censorers):
+            ignored_zones.extend(i.zones)
+        cens.download_and_apply_if_updated(ignored_zones=ignored_zones)
 
 
 parser = argparse.ArgumentParser(description='Bind DNS censorer')
@@ -63,6 +74,8 @@ else:
     print("WARNING: missing mailer configuration, no CNCPO notification will be sent")
 
 censorers = list()
+censorer_zones = dict()
+lock = Lock()
 for section in sections:
     censorer = None
     cfg = config[section]
@@ -96,6 +109,7 @@ for section in sections:
         else:
             censorer = CNCPOBind(cfg['url'], certificate=cfg['certificate'], key=cfg['key'], conf_file=cfg['conf_file'],
                                  name=section)
+        censorer_zones[section] = censorer.zones
 
     elif cfg['type'].upper() == 'AAMS':
         print("Adding AAMS censorer %s" % section)
@@ -117,10 +131,12 @@ for section in sections:
         schedules = cfg['schedule'].split()
         for s in schedules:
             print("Scheduling execution at %s every day" % s)
-            schedule.every().day.at(s).do(censorer.download_and_apply_if_updated)
+            # schedule.every().day.at(s).do(censorer.download_and_apply_if_updated)
+            schedule.every().day.at(s).do(run_task, censorer)
     elif cfg['scheduler_type'] == 'interval':
         print("Scheduling execution every %s seconds" % cfg['schedule'])
-        schedule.every(int(cfg['schedule'])).seconds.do(censorer.download_and_apply_if_updated)
+        # schedule.every(int(cfg['schedule'])).seconds.do(censorer.download_and_apply_if_updated)
+        schedule.every(int(cfg['schedule'])).seconds.do(run_task, censorer)
     else:
         fatal_error("Wrong scheduler type %s" % cfg['scheduler_type'])
     if mailer:

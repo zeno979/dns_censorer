@@ -55,25 +55,32 @@ class CNCPOBind(BindCensorer):
         else:
             self.__logger.warning('%s Download issue: %s' % (self.name, response.text))
 
-    def apply(self, version_tuple):
+    def apply(self, version_tuple, ignored_zones=None):
         """
         Generate configuration from downloaded file
         :param version_tuple:
+        :param ignored_zones:
         :return:
         """
+        if ignored_zones is None:
+            ignored_zones = list()
+        zones = list()
         with open('%s/%s' % (self.spool_dir, self.name), 'r') as csv:
             lines = csv.readlines()
             lines.pop(0)
             self.__logger.info("Applying %s version %s" % (self.name, version_tuple[0]))
             with open(self.conf_file, 'w') as out:
                 out.write('//SERIAL:%s//TIMESTAMP:%s\n' % version_tuple)
-                zones = list()
                 for line in lines:
                     parts = line.split(';')
                     zone = parts[1].strip()
-                    if zone and zone not in zones:
+                    if zone and zone not in zones and zone not in ignored_zones:
                         zones.append(zone)
+                        self.__logger.info("Adding zone %s for %s" % (zone, self.name))
+                    else:
+                        self.__logger.info("Skipping zone %s for %s" % (zone, self.name))
                 for zone in zones:
                     out.write(self.template.substitute(zone=zone))
                     out.write('\n')
             self.notify_observers(version_tuple)
+        self.zones = zones

@@ -18,19 +18,21 @@ class BindCensorer(ABC):
         :param spool_dir: spool directory for lists download and manupulation
         :param name: name for this censorer (default random string)
         """
+        self.zones = list()
         self._observers = list()
         self.conf_file = conf_file
+        if not name:
+            self.name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+        else:
+            self.name = name
+        self.template = template
+        regex_str = re.escape(self.template.template).replace('\\$zone', '(.*)')
         f = open(self.conf_file, 'a')
         try:
             if not f.writable():
                 raise PermissionError('config file %s not writable' % self.conf_file)
         finally:
             f.close()
-        self.template = template
-        if not name:
-            self.name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
-        else:
-            self.name = name
         self.spool_dir = spool_dir
         f = open('%s/%s' % (self.spool_dir, self.name), 'a')
         try:
@@ -39,6 +41,16 @@ class BindCensorer(ABC):
         finally:
             f.close()
         self.__logger = logging.getLogger(__name__)
+        regex = re.compile(regex_str)
+        with open(self.conf_file, 'r') as lines:
+            while True:
+                try:
+                    l = next(lines)
+                    m = regex.search(l)
+                    if m:
+                        self.zones.append(m.group(1))
+                except StopIteration:
+                    break
 
     def current_version(self):
         """
@@ -75,16 +87,16 @@ class BindCensorer(ABC):
         for observer in self._observers:
             observer.notify(self, message)
 
-    def download_and_apply_if_updated(self):
+    def download_and_apply_if_updated(self, ignored_zones: list=None):
         version = self.download()
         if version and self.updated(version):
-            self.apply(version)
+            self.apply(version, ignored_zones)
 
     @abstractmethod
     def download(self):
         pass
 
     @abstractmethod
-    def apply(self, version_tuple):
+    def apply(self, version_tuple, ignored_zones=None):
         pass
 
